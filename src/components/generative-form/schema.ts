@@ -1,34 +1,28 @@
-import * as Yup from "yup";
+import { z } from "zod";
 
-const MAX_FILE_SIZE = 102400; // 100KB
+const MAX_FILE_SIZE = 5000000;
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
 
-const validFileExtensions = {
-  image: ["jpg", "gif", "png", "jpeg", "svg", "webp"],
-} as const;
-
-type FileType = keyof typeof validFileExtensions;
-type ImageFileExtension = (typeof validFileExtensions.image)[number];
-
-function isValidFileType(
-  fileName: string | undefined,
-  fileType: FileType
-): boolean {
-  if (!fileName) return false;
-  const fileExtension = fileName.split(".").pop() as ImageFileExtension;
-  return validFileExtensions[fileType].includes(fileExtension);
-}
-
-export const GerativeFormSchema = Yup.object().shape({
-  background: Yup.string().required("Background is required"),
-  selfie: Yup.mixed<File>()
-    .required("A file is required")
-    .test("is-valid-type", "Not a valid image type", (value) => {
-      const file = value as File | null;
-      return isValidFileType(file?.name.toLowerCase(), "image");
-    })
-    .test("is-valid-size", "Max allowed size is 100KB", (value) => {
-      const file = value as File | null;
-      return file ? file.size <= MAX_FILE_SIZE : false;
-    })
-    .required("A file is required"),
+export const generativeSchema = z.object({
+  background: z
+    .string()
+    .refine((value) => value.trim().length > 0, "Background is required."),
+  photo: z
+    .any()
+    .refine((files) => files?.length > 0, "Photo is required.")
+    .refine(
+      (files) => files?.[0]?.size <= MAX_FILE_SIZE,
+      `Max image size is 5MB.`
+    )
+    .refine(
+      (files) => ACCEPTED_IMAGE_TYPES.includes(files?.[0]?.type),
+      "Only .jpg, .jpeg, .png and .webp formats are supported."
+    ),
 });
+
+export type GenerativeFormValues = z.infer<typeof generativeSchema>;

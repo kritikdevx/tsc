@@ -1,54 +1,96 @@
 "use client";
 
 import React from "react";
-import { useFormik } from "formik";
-import { GerativeFormSchema } from "./schema";
+import { useForm, SubmitHandler } from "react-hook-form";
+import { generativeSchema, GenerativeFormValues } from "./schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import backgrounds from "~/lib/backgrounds";
+import Image from "next/image";
+import { cn } from "~/lib/utils";
 
 export default function GenerativeForm() {
-  const formik = useFormik({
-    initialValues: {
-      selfie: null,
-      background: "beach.jpg",
-    },
-    validationSchema: GerativeFormSchema,
-    onSubmit: async (values) => {
-      console.log(JSON.stringify(values, null, 2));
-      const formData = new FormData();
-      formData.append("selfie", values.selfie!);
-      formData.append("background", values.background);
+  const {
+    register,
+    watch,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<GenerativeFormValues>({
+    resolver: zodResolver(generativeSchema),
+    defaultValues: {
+      background: backgrounds[0].id,
+      photo: [],
     },
   });
 
+  const onSubmit: SubmitHandler<GenerativeFormValues> = async (data) => {
+    const formData = new FormData();
+    formData.append("background", data.background);
+    formData.append("photo", data.photo[0]);
+
+    const res = await fetch("http://localhost:3000/api/generate-photo", {
+      method: "POST",
+      headers: {
+        Accept: "multipart/form-data",
+      },
+      body: formData,
+    });
+
+    reset();
+  };
+
   return (
-    <form onSubmit={formik.handleSubmit} className="flex flex-col space-y-4">
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(event) =>
-          formik.setFieldValue("selfie", event.currentTarget.files?.[0] || null)
-        }
-        onBlur={formik.handleBlur}
-        className="border p-2"
-      />
-      {formik.errors.selfie && formik.touched.selfie && (
-        <div style={{ color: "red" }}>{formik.errors.selfie}</div>
-      )}
-      <select
-        name="background"
-        value={formik.values.background}
-        onChange={formik.handleChange}
-        onBlur={formik.handleBlur}
-        className="border p-2"
+    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-y-4 w-full">
+      <label htmlFor="photo" className="grid gap-y-2 text-sm font-medium">
+        Photo
+        <input
+          id="photo"
+          type="file"
+          {...register("photo")}
+          accept="image/jpeg, image/jpg, image/png, image/webp"
+        />
+        {errors.photo && (
+          <p className="text-red-500 text-sm">
+            {errors.photo.message?.toString()}
+          </p>
+        )}
+      </label>
+
+      <label htmlFor="background" className="grid gap-y-2 text-sm font-medium">
+        Background
+        <div className="flex flex-wrap gap-2">
+          {backgrounds.map((background) => (
+            <label key={background.id} className="relative">
+              <input
+                id={background.id}
+                type="radio"
+                value={background.id}
+                {...register("background")}
+                className="sr-only"
+              />
+              <Image
+                src={background.image}
+                alt={`Background ${background.id}`}
+                width={100}
+                height={100}
+                className={cn("cursor-pointer rounded-md", {
+                  // get selected background
+                  "ring-2 ring-blue-500": watch("background") === background.id,
+                })}
+              />
+            </label>
+          ))}
+        </div>
+        {errors.background && (
+          <p className="text-red-500 text-sm">{errors.background.message}</p>
+        )}
+      </label>
+
+      <button
+        type="submit"
+        className="w-full px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600"
       >
-        <option value="beach.jpg">Beach</option>
-        <option value="city.jpg">City</option>
-        {/* Add more backgrounds */}
-      </select>
-      {formik.errors.background && formik.touched.background && (
-        <div style={{ color: "red" }}>{formik.errors.background}</div>
-      )}
-      <button type="submit" className="bg-blue-500 text-white p-2 rounded">
-        Process Image
+        Submit
       </button>
     </form>
   );
