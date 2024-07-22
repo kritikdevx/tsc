@@ -36,7 +36,7 @@ export default function GenerativeForm() {
       body: formData,
     });
 
-    reset();
+    // reset();
   };
 
   return (
